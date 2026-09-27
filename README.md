@@ -32,6 +32,13 @@ Optionally allow the tool up front — useful if you have a `deny` rule for `*`:
 A subagent's call patches the list it was handed instead: items are matched on
 `content`, new ones are appended, and nothing is removed.
 
+The updated list is returned as the tool result *and* posted to the chat as a
+synthetic message labelled **Todo list**, so the plan is visible in the
+transcript without expanding the tool block. A synthetic message is a
+user-role line in the context too; `resume: false` keeps it from spending a
+turn. A subagent's write posts to the parent session, which is where the
+merged list lives.
+
 ```jsonc
 { "todos": [{ "content": "Reproduce the bug", "status": "in_progress", "priority": "high" }] }
 ```

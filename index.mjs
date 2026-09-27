@@ -64,6 +64,19 @@ function mergeInto(ownerList, incoming) {
   return merged
 }
 
+/**
+ * A tool result only shows in the tool's own (collapsed) block, so the list is also posted as a
+ * synthetic message — the one thing a plugin can put in the transcript itself. `resume: false`,
+ * because the model already has the list from the tool result and the context hook; a resume
+ * would spend a turn on it.
+ * ponytail: a failed post is swallowed — the file is what the next turn reads, and a cosmetic
+ * line must not fail a write that already landed.
+ */
+const announce = (ctx, sessionID, text) =>
+  ctx.session
+    .synthetic({ sessionID, text, description: 'Todo list', resume: false })
+    .catch(() => {})
+
 export default {
   id: 'todowrite',
   setup: async (ctx) => {
@@ -71,7 +84,7 @@ export default {
       tools.add({
         name: 'todowrite',
         description:
-          'Replace the session todo list. Send the whole list every call, not a diff. Keep one item per step, and only one in_progress at a time. The list shows in the TUI sidebar. In a subagent, the list is shared with the parent session: your call patches the items it handed you (matched on text, so new items are appended and nothing is removed) instead of replacing the whole list.',
+          'Replace the session todo list. Send the whole list every call, not a diff. Keep one item per step, and only one in_progress at a time. The updated list comes back as the tool result and is also posted to the chat. In a subagent, the list is shared with the parent session: your call patches the items it handed you (matched on text, so new items are appended and nothing is removed) instead of replacing the whole list.',
         input: {
           type: 'object',
           properties: {
@@ -107,12 +120,14 @@ export default {
             writeTodos(owner, merged)
             // Keep this session's view current, or it reasons from the pre-write snapshot.
             adopted.set(context.sessionID, { todos: merged, owner })
+            await announce(ctx, owner, render(merged))
             return {
               content: `Updated the parent session list in place:\n${render(merged)}\nRemoving items is the parent session's call; add what you discovered.`,
             }
           }
 
           writeTodos(owner, todos)
+          await announce(ctx, owner, todos.length ? render(todos) : 'Todo list cleared.')
           return { content: todos.length ? render(todos) : 'Todo list cleared.' }
         },
       })
